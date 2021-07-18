@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/BurntSushi/toml v0.3.1
 	github.com/Masterminds/sprig/v3 v3.1.0
-	github.com/go-logr/logr v0.1.0
+	github.com/go-logr/logr v0.4.0
 	github.com/golang/mock v1.4.4
 	github.com/google/go-cmp v0.4.1 // indirect
 	github.com/onsi/ginkgo v1.14.2
