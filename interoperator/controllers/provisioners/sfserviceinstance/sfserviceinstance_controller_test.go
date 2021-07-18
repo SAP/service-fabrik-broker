@@ -331,6 +331,168 @@ func TestReconcileSFServiceInstance_handleError(t *testing.T) {
 	}
 }
 
+func TestReconcileSFServiceInstance_handleErrorResponse(t *testing.T) {
+	g := gomega.NewGomegaWithT(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mgr, err := manager.New(cfg, manager.Options{
+		MetricsBindAddress: "0",
+	})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	c, err = client.New(cfg, client.Options{
+		Scheme: mgr.GetScheme(),
+		Mapper: mgr.GetRESTMapper(),
+	})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	mockResourceManager := mock_resources.NewMockResourceManager(ctrl)
+	mockClusterRegistry := mock_clusterRegistry.NewMockClusterRegistry(ctrl)
+	stopMgr, mgrStopped := StartTestManager(mgr, g)
+	defer func() {
+		close(stopMgr)
+		mgrStopped.Wait()
+	}()
+
+	instance := &osbv1alpha1.SFServiceInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "instance-id",
+			Namespace: constants.InteroperatorNamespace,
+			Labels: map[string]string{
+				"state":                 "in_queue",
+				constants.ErrorCountKey: "10",
+			},
+		},
+		Spec: osbv1alpha1.SFServiceInstanceSpec{
+			ServiceID:        "service-id",
+			PlanID:           "plan-id",
+			RawContext:       nil,
+			OrganizationGUID: "organization-guid",
+			SpaceGUID:        "space-guid",
+			RawParameters:    nil,
+			PreviousValues:   nil,
+		},
+		Status: osbv1alpha1.SFServiceInstanceStatus{
+			State: "in_queue",
+		},
+	}
+
+	instance2 := &osbv1alpha1.SFServiceInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "instance-id-2",
+			Namespace: constants.InteroperatorNamespace,
+			Labels: map[string]string{
+				"state":                 "in_queue",
+				constants.ErrorCountKey: "10",
+			},
+		},
+		Spec: osbv1alpha1.SFServiceInstanceSpec{
+			ServiceID:        "service-id",
+			PlanID:           "plan-id",
+			RawContext:       nil,
+			OrganizationGUID: "organization-guid",
+			SpaceGUID:        "space-guid",
+			RawParameters:    nil,
+			PreviousValues:   nil,
+		},
+		Status: osbv1alpha1.SFServiceInstanceStatus{
+			State: "in_queue",
+		},
+	}
+	err = c.Create(context.TODO(), instance)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	err = c.Create(context.TODO(), instance2)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	serviceInstance := &osbv1alpha1.SFServiceInstance{}
+	g.Eventually(func() error {
+		return c.Get(context.TODO(), instanceKey, serviceInstance)
+	}, timeout).Should(gomega.Succeed())
+
+	r := &ReconcileSFServiceInstance{
+		Client:          c,
+		Log:             ctrlrun.Log.WithName("provisioners").WithName("instance"),
+		scheme:          mgr.GetScheme(),
+		clusterRegistry: mockClusterRegistry,
+		resourceManager: mockResourceManager,
+	}
+	type args struct {
+		object        *osbv1alpha1.SFServiceInstance
+		result        reconcile.Result
+		inputErr      error
+		lastOperation string
+		retryCount    int
+		err           error
+	}
+	tests := []struct {
+		name       string
+		setup      func()
+		args       args
+		want       reconcile.Result
+		wantErr    bool
+		wantErrMsg string
+	}{
+		{
+			/*Default test on "APIVersion Notfound" error is being used to test the InputErr not-null case.*/
+			name: "return input error message if inputErr is not empty",
+			args: args{
+				object:        instance,
+				result:        reconcile.Result{},
+				err:           fmt.Errorf("Object 'apiVersion' is missing in 'unstructured object has no version'"),
+				inputErr:      errors.NewMarshalError("Object 'apiVersion' is missing in 'unstructured object has no version'", err),
+				lastOperation: "in_queue",
+				retryCount:    0,
+			},
+			want:       reconcile.Result{},
+			wantErr:    false,
+			wantErrMsg: "Object 'apiVersion' is missing in 'unstructured object has no version'",
+		},
+		{
+			name: "return default error message if inputErr is empty",
+			setup: func() {
+				g.Expect(c.Delete(context.TODO(), serviceInstance)).NotTo(gomega.HaveOccurred())
+				g.Eventually(func() error {
+					err := c.Get(context.TODO(), instanceKey, serviceInstance)
+					if err != nil {
+						return nil
+					}
+					return errors.NewMarshalError("", nil)
+				}, timeout).Should(gomega.Succeed())
+			},
+			args: args{
+				object:        instance2,
+				result:        reconcile.Result{},
+				inputErr:      errors.NewMarshalError("", nil),
+				lastOperation: "in_queue",
+				retryCount:    0,
+			},
+			want:       reconcile.Result{},
+			wantErr:    false,
+			wantErrMsg: "Service Broker Error, status code: ETIMEDOUT, error code: 10008",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setup != nil {
+				tt.setup()
+			}
+			got, err := r.handleError(tt.args.object, tt.args.result, tt.args.inputErr, tt.args.lastOperation, tt.args.retryCount)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReconcileSFServiceInstance.handleError() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReconcileSFServiceInstance.handleError() = %v, want %v", got, tt.want)
+			}
+			if tt.args.object.Status.Description != tt.wantErrMsg {
+				t.Errorf("ReconcileSFServiceInstance.handleError() error = %v, wantErrMessage = %v", tt.args.object.Status.Description, tt.wantErrMsg)
+				return
+			}
+		})
+	}
+}
+
 func TestReconcileSFServiceInstance_setInProgress(t *testing.T) {
 	g := gomega.NewGomegaWithT(t)
 	ctrl := gomock.NewController(t)

@@ -22,6 +22,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 
 	osbv1alpha1 "github.com/cloudfoundry-incubator/service-fabrik-broker/interoperator/api/osb/v1alpha1"
 	"github.com/cloudfoundry-incubator/service-fabrik-broker/interoperator/internal/config"
@@ -505,6 +506,36 @@ func (r *ReconcileSFServiceInstance) handleError(object *osbv1alpha1.SFServiceIn
 		}
 	}
 
+	if inputErr != nil {
+		if statusError, ok := inputErr.(*apiErrors.StatusError); ok {
+			if statusError.ErrStatus.Code == 422 {
+				log.Error(inputErr, "Encountered StatusError")
+				object.Status.State = "failed"
+				object.Status.Error = fmt.Sprintf("StatusError encountered for %s.\n%s", objectID, inputErr.Error())
+				causes := statusError.ErrStatus.Details.Causes
+				if len(causes) > 0 {
+					messages := make([]string, 0)
+					for _, v := range causes {
+						messages = append(messages, v.Message)
+					}
+					object.Status.Description = fmt.Sprintf("%s, Error code: 422", strings.Join(messages[:], ", "))
+				} else if inputErr.Error() != "" {
+					object.Status.Description = fmt.Sprintf("%s, Error code: 422", inputErr.Error())
+				} else {
+					object.Status.Description = "Unprocessable Entity - this is usually caused by invalid request parameters, Error code: 422"
+				}
+				if lastOperation != "" {
+					labels[constants.LastOperationKey] = lastOperation
+					object.SetLabels(labels)
+				}
+				err := r.Update(ctx, object)
+				if err != nil {
+					log.Error(err, "Failed to set state to failed", "objectID", objectID)
+				}
+				return result, nil
+			}
+		}
+	}
 	if inputErr == nil {
 		if count == 0 {
 			//No change for count
@@ -519,7 +550,11 @@ func (r *ReconcileSFServiceInstance) handleError(object *osbv1alpha1.SFServiceIn
 		log.Error(inputErr, "Retry threshold reached. Ignoring error")
 		object.Status.State = "failed"
 		object.Status.Error = fmt.Sprintf("Retry threshold reached for %s.\n%s", objectID, inputErr.Error())
-		object.Status.Description = "Service Broker Error, status code: ETIMEDOUT, error code: 10008"
+		if inputErr.Error() != "" {
+			object.Status.Description = inputErr.Error()
+		} else {
+			object.Status.Description = "Service Broker Error, status code: ETIMEDOUT, error code: 10008"
+		}
 		if lastOperation != "" {
 			labels[constants.LastOperationKey] = lastOperation
 			object.SetLabels(labels)

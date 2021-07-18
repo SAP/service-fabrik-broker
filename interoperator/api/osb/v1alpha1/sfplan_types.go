@@ -85,7 +85,7 @@ type SFPlanSpec struct {
 
 	// +kubebuilder:pruning:PreserveUnknownFields
 	Metadata               *runtime.RawExtension `json:"metadata,omitempty"`
-	MaintenanceInfo        *MaintenanceInfo       `json:"maintenance_info,omitempty"`
+	MaintenanceInfo        *MaintenanceInfo      `json:"maintenance_info,omitempty"`
 	MaximumPollingDuration int                   `json:"maximum_polling_duration,omitempty"`
 	Free                   bool                  `json:"free"`
 	Bindable               bool                  `json:"bindable"`

@@ -54,6 +54,8 @@ spec:
               instanceId:
                 type: string
               metadata:
+                description: MetadataSpec defines an optional object containing metadata
+                  for the Service Instance.
                 properties:
                   attributes:
                     additionalProperties:
@@ -96,6 +98,8 @@ spec:
                   instanceId:
                     type: string
                   metadata:
+                    description: MetadataSpec defines an optional object containing
+                      metadata for the Service Instance.
                     properties:
                       attributes:
                         additionalProperties:
