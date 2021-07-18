@@ -115,3 +115,14 @@ spec:
   ...
 ```
 A minimum `X-Broker-API-Version` of 2.14 is required for the GET endpoints.
+
+## Single Namespace for all Service Instances
+
+The Interoperator creates separate namespaces for each service instances. If one wants all the service instance under a single namespace, set `broker.enable_namespaced_separation` as `false` in `values.yaml`.
+If you are using helm, then
+```sh
+$ helm install --set cluster.host=xxxx \
+     --set broker.enable_namespaced_separation=false \
+     --set broker.services_namespace=services \
+     --namespace interoperator --wait interoperator interoperator
+```
