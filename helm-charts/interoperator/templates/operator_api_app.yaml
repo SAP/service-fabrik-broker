@@ -19,7 +19,7 @@ spec:
   selector:
     app: {{ .Release.Name }}-op-apis-app
 ---
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   labels:
@@ -35,8 +35,11 @@ spec:
     http:
       paths:
       - backend:
-          serviceName: {{ .Release.Name }}-op-apis-service
-          servicePort: 80
+          service:
+            name: {{ .Release.Name }}-op-apis-service
+            port:
+              number: 80
+        pathType: ImplementationSpecific
   {{- if .Values.operator_apis.ssl }} 
   tls:
   - hosts:

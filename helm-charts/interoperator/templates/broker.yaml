@@ -18,7 +18,7 @@ spec:
   selector:
     app: {{ .Release.Name }}-broker
 ---
-apiVersion: extensions/v1beta1
+apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   labels:
@@ -34,8 +34,11 @@ spec:
     http:
       paths:
       - backend:
-          serviceName: {{ .Release.Name }}-broker-service
-          servicePort: 80
+          service:
+              name: {{ .Release.Name }}-broker-service
+              port:
+                number: 80
+        pathType: ImplementationSpecific
   {{- if .Values.cluster.ssl }} 
   tls:
   - hosts:
