@@ -119,7 +119,8 @@ function getPlanCrdFromConfig(plan, service) {
       name: plan.id,
       labels: {
         'controller-tools.k8s.io': '1.0',
-        serviceId: service.id
+        serviceId: service.id,
+        planId: plan.id
       }
     },
     spec: {
