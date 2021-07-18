@@ -1,0 +1,8 @@
+{{- if not .Values.broker.enable_namespaced_separation }}
+{{- if .Values.broker.create_services_namespace }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.broker.services_namespace }}
+{{- end }}
+{{- end }}

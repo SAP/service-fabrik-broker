@@ -14,6 +14,7 @@ broker:
   username: broker
   password: secret
   enable_namespaced_separation: true
+  create_services_namespace: false
   services_namespace: "services"
   allow_concurrent_operations: true
   allow_concurrent_binding_operations: true
